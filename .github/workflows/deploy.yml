@@ -66,8 +66,14 @@ jobs:
             exit 1
           fi
           echo "Build output verified successfully"
-          echo "Files in build/web:"
-          ls -la build/web/ | head -20
+          echo "=== Files in build/web ==="
+          ls -la build/web/ | head -30
+          echo "=== Checking index.html content ==="
+          head -20 build/web/index.html
+          echo "=== File sizes ==="
+          du -sh build/web/*
+          echo "=== Total build size ==="
+          du -sh build/web
 
       - name: Create .nojekyll file
         run: |
@@ -77,6 +83,15 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
+
+      - name: List files before upload
+        run: |
+          echo "=== Files to be uploaded ==="
+          find build/web -type f | head -30
+          echo "=== Checking for index.html ==="
+          test -f build/web/index.html && echo "✓ index.html exists" || echo "✗ index.html NOT FOUND"
+          echo "=== Checking for .nojekyll ==="
+          test -f build/web/.nojekyll && echo "✓ .nojekyll exists" || echo "✗ .nojekyll NOT FOUND"
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
