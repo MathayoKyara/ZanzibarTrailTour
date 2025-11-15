@@ -41,10 +41,19 @@ jobs:
           echo "Repository name: $REPO_NAME"
           echo "Fixing base href in index.html..."
           if [ -f "$INDEX_FILE" ]; then
+            # Try multiple patterns to ensure we catch all variations
             sed -i "s|<base href=\"/\">|<base href=\"/${REPO_NAME}/\">|g" "$INDEX_FILE"
+            sed -i "s|<base href='/'>|<base href=\"/${REPO_NAME}/\">|g" "$INDEX_FILE"
+            sed -i "s|<base href=\"\/\">|<base href=\"/${REPO_NAME}/\">|g" "$INDEX_FILE"
             echo "✓ Base href fixed successfully"
             echo "Verifying base href fix:"
             grep -n "base href" "$INDEX_FILE" || echo "Base href not found in index.html"
+            # Double-check it was actually changed
+            if grep -q "<base href=\"/\">" "$INDEX_FILE"; then
+              echo "⚠ WARNING: Base href still shows '/', trying alternative fix..."
+              sed -i "s|<base href=\"/\">|<base href=\"/${REPO_NAME}/\">|" "$INDEX_FILE"
+              grep -n "base href" "$INDEX_FILE"
+            fi
           else
             echo "✗ Error: index.html not found at $INDEX_FILE"
             exit 1
@@ -83,21 +92,65 @@ jobs:
 
       - name: Create .nojekyll file
         run: |
+          echo "Creating .nojekyll file to prevent Jekyll processing..."
           touch build/web/.nojekyll
-          echo "Created .nojekyll file"
-          ls -la build/web/.nojekyll || echo "Warning: .nojekyll file check failed"
+          echo "" > build/web/.nojekyll
+          echo "✓ Created .nojekyll file"
+          if [ -f "build/web/.nojekyll" ]; then
+            echo "✓ Verified .nojekyll exists"
+            ls -la build/web/.nojekyll
+          else
+            echo "✗ ERROR: .nojekyll file creation failed!"
+            exit 1
+          fi
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
-      - name: List files before upload
+      - name: Final verification before upload
         run: |
+          echo "=== FINAL VERIFICATION ==="
           echo "=== Files to be uploaded ==="
           find build/web -type f | head -30
+          echo ""
           echo "=== Checking for index.html ==="
-          test -f build/web/index.html && echo "✓ index.html exists" || echo "✗ index.html NOT FOUND"
+          if [ -f "build/web/index.html" ]; then
+            echo "✓ index.html exists"
+            echo "=== Verifying base href in index.html ==="
+            BASE_HREF_LINE=$(grep "base href" build/web/index.html || echo "NOT FOUND")
+            echo "Base href line found: $BASE_HREF_LINE"
+            if echo "$BASE_HREF_LINE" | grep -q "/ZanzibarTrailTour/"; then
+              echo "✓ Base href is CORRECT: /ZanzibarTrailTour/"
+            else
+              echo "✗ ERROR: Base href is WRONG! Expected /ZanzibarTrailTour/ but found: $BASE_HREF_LINE"
+              echo "Attempting emergency fix..."
+              sed -i 's|<base href="[^"]*">|<base href="/ZanzibarTrailTour/">|' build/web/index.html
+              sed -i "s|<base href='/'>|<base href=\"/ZanzibarTrailTour/\">|" build/web/index.html
+              sed -i "s|<base href=\"/\">|<base href=\"/ZanzibarTrailTour/\">|" build/web/index.html
+              echo "After fix:"
+              grep "base href" build/web/index.html
+            fi
+          else
+            echo "✗ index.html NOT FOUND"
+            exit 1
+          fi
+          echo ""
           echo "=== Checking for .nojekyll ==="
-          test -f build/web/.nojekyll && echo "✓ .nojekyll exists" || echo "✗ .nojekyll NOT FOUND"
+          if [ -f "build/web/.nojekyll" ]; then
+            echo "✓ .nojekyll exists"
+          else
+            echo "✗ .nojekyll NOT FOUND - creating now..."
+            touch build/web/.nojekyll
+            echo "" > build/web/.nojekyll
+          fi
+          echo ""
+          echo "=== Checking for 404.html ==="
+          if [ -f "build/web/404.html" ]; then
+            echo "✓ 404.html exists"
+          else
+            echo "✗ 404.html NOT FOUND"
+            exit 1
+          fi
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
