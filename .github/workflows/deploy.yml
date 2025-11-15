@@ -59,14 +59,37 @@ jobs:
             exit 1
           fi
 
+      - name: Fix manifest.json start_url
+        run: |
+          REPO_NAME="${{ github.event.repository.name }}"
+          MANIFEST_FILE="build/web/manifest.json"
+          if [ -f "$MANIFEST_FILE" ]; then
+            echo "Fixing manifest.json start_url for GitHub Pages..."
+            # Update start_url to include repository path
+            sed -i "s|\"start_url\": \".\"|\"start_url\": \"/${REPO_NAME}/\"|g" "$MANIFEST_FILE"
+            sed -i "s|\"start_url\": \"/\"|\"start_url\": \"/${REPO_NAME}/\"|g" "$MANIFEST_FILE"
+            echo "✓ Manifest.json fixed"
+            grep "start_url" "$MANIFEST_FILE" || echo "start_url not found in manifest"
+          else
+            echo "⚠ Warning: manifest.json not found, skipping"
+          fi
+
       - name: Add 404.html for SPA routing
         run: |
           REPO_NAME="${{ github.event.repository.name }}"
           # Copy index.html to 404.html so client-side routing works on GitHub Pages
+          # This ensures that when users navigate to routes, they get the Flutter app
           if [ -f "build/web/index.html" ]; then
             cp build/web/index.html build/web/404.html
             echo "✓ Created 404.html from index.html for SPA routing"
             echo "This ensures client-side routes work correctly on GitHub Pages"
+            # Verify 404.html has the correct base href
+            if grep -q "<base href=\"/${REPO_NAME}/\">" build/web/404.html; then
+              echo "✓ 404.html has correct base href"
+            else
+              echo "⚠ Warning: 404.html base href may need fixing"
+              grep "base href" build/web/404.html || echo "Base href not found"
+            fi
           else
             echo "✗ Error: index.html not found, cannot create 404.html"
             exit 1
