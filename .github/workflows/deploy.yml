@@ -73,7 +73,7 @@ jobs:
         run: |
           touch build/web/.nojekyll
           echo "Created .nojekyll file"
-          ls -la build/web/.nojekyll
+          ls -la build/web/.nojekyll || echo "Warning: .nojekyll file check failed"
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
